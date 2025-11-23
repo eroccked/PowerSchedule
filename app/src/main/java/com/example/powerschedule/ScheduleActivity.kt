@@ -2,6 +2,7 @@ package com.example.powerschedule
 
 import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -16,13 +17,14 @@ class ScheduleActivity : AppCompatActivity() {
     private lateinit var approvedText: TextView
     private lateinit var shutdownsContainer: LinearLayout
     private lateinit var totalTimeText: TextView
+    private lateinit var timelineContainer: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_schedule)
 
-
         val queue = intent.getStringExtra("queue") ?: "5.2"
+        val name = intent.getStringExtra("name") ?: "Черга"
         val jsonString = intent.getStringExtra("json") ?: ""
 
         queueTitle = findViewById(R.id.queueTitle)
@@ -31,11 +33,12 @@ class ScheduleActivity : AppCompatActivity() {
         approvedText = findViewById(R.id.approvedText)
         shutdownsContainer = findViewById(R.id.shutdownsContainer)
         totalTimeText = findViewById(R.id.totalTimeText)
+        timelineContainer = findViewById(R.id.timelineContainer)
 
         val backButton = findViewById<Button>(R.id.backButton)
         val refreshButton = findViewById<Button>(R.id.refreshButton)
 
-        queueTitle.text = "Черга $queue"
+        queueTitle.text = "$name ($queue)"
 
         parseAndDisplay(jsonString, queue)
 
@@ -43,7 +46,6 @@ class ScheduleActivity : AppCompatActivity() {
             finish()
         }
 
-        // Кнопка оновити
         refreshButton.setOnClickListener {
             recreate()
         }
@@ -54,23 +56,20 @@ class ScheduleActivity : AppCompatActivity() {
             val jsonArray = JSONArray(jsonString)
             val scheduleObj = jsonArray.getJSONObject(0)
 
-            // Дата
             val eventDate = scheduleObj.getString("eventDate")
             dateText.text = "📅 $eventDate"
 
-            // Коли оновлено
             val createdAt = scheduleObj.getString("createdAt")
             updatedText.text = "Оновлено: $createdAt"
 
-            // Коли затверджено
             val approved = scheduleObj.getString("scheduleApprovedSince")
             approvedText.text = "Затверджено з: $approved"
 
-            // Отримуємо список відключень
             val queuesObj = scheduleObj.getJSONObject("queues")
             val shutdowns = queuesObj.getJSONArray(queue)
 
             var totalMinutes = 0
+
             for (i in 0 until shutdowns.length()) {
                 val shutdown = shutdowns.getJSONObject(i)
                 val from = shutdown.getString("from")
@@ -86,8 +85,10 @@ class ScheduleActivity : AppCompatActivity() {
             val minutes = totalMinutes % 60
             totalTimeText.text = "📊 ВСЬОГО: $hours год $minutes хв без світла"
 
+            createTimeline(shutdowns)
+
         } catch (e: Exception) {
-            dateText.text = "❌ Помилка парсингу: ${e.message}"
+            dateText.text = "❌ Помилка парсингу: Немає інформації"
         }
     }
 
@@ -136,6 +137,42 @@ class ScheduleActivity : AppCompatActivity() {
         val toMinutes = toParts[0].toInt() * 60 + toParts[1].toInt()
 
         return toMinutes - fromMinutes
+    }
+
+    private fun createTimeline(shutdowns: JSONArray) {
+        timelineContainer.removeAllViews()
+
+        val hours = BooleanArray(24) { true }
+
+        for (i in 0 until shutdowns.length()) {
+            val shutdown = shutdowns.getJSONObject(i)
+            val from = shutdown.getString("from")
+            val to = shutdown.getString("to")
+
+            val fromHour = from.split(":")[0].toInt()
+            val toHour = to.split(":")[0].toInt()
+
+            for (hour in fromHour until toHour) {
+                if (hour < 24) {
+                    hours[hour] = false
+                }
+            }
+        }
+
+        for (hour in hours) {
+            val block = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    1f
+                )
+                setBackgroundColor(
+                    if (hour) Color.parseColor("#4CAF50")
+                    else Color.parseColor("#F44336")
+                )
+            }
+            timelineContainer.addView(block)
+        }
     }
 
     private fun dpToPx(dp: Int): Int {
