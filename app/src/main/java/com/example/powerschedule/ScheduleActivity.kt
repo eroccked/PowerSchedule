@@ -6,7 +6,9 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import org.json.JSONArray
 
 class ScheduleActivity : AppCompatActivity() {
@@ -18,13 +20,17 @@ class ScheduleActivity : AppCompatActivity() {
     private lateinit var shutdownsContainer: LinearLayout
     private lateinit var totalTimeText: TextView
     private lateinit var timelineContainer: LinearLayout
+    private lateinit var notificationSwitch: SwitchCompat
+
+    private var queue: String = ""
+    private var name: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_schedule)
 
-        val queue = intent.getStringExtra("queue") ?: "5.2"
-        val name = intent.getStringExtra("name") ?: "Черга"
+        queue = intent.getStringExtra("queue") ?: "5.2"
+        name = intent.getStringExtra("name") ?: "Черга"
         val jsonString = intent.getStringExtra("json") ?: ""
 
         queueTitle = findViewById(R.id.queueTitle)
@@ -34,11 +40,30 @@ class ScheduleActivity : AppCompatActivity() {
         shutdownsContainer = findViewById(R.id.shutdownsContainer)
         totalTimeText = findViewById(R.id.totalTimeText)
         timelineContainer = findViewById(R.id.timelineContainer)
+        notificationSwitch = findViewById(R.id.notificationSwitch)
 
         val backButton = findViewById<Button>(R.id.backButton)
         val refreshButton = findViewById<Button>(R.id.refreshButton)
 
         queueTitle.text = "$name ($queue)"
+
+        NotificationHelper.createNotificationChannel(this)
+
+        val prefs = getSharedPreferences("PowerSchedule", MODE_PRIVATE)
+        val notificationsEnabled = prefs.getBoolean("notifications_$queue", false)
+        notificationSwitch.isChecked = notificationsEnabled
+
+        notificationSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("notifications_$queue", isChecked).apply()
+
+            if (isChecked) {
+                scheduleNotifications(queue, name, jsonString)
+                Toast.makeText(this, "✅ Нагадування увімкнено", Toast.LENGTH_SHORT).show()
+            } else {
+                NotificationHelper.cancelAllNotifications(this)
+                Toast.makeText(this, "❌ Нагадування вимкнено", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         parseAndDisplay(jsonString, queue)
 
@@ -77,7 +102,6 @@ class ScheduleActivity : AppCompatActivity() {
                 val shutdownHours = shutdown.getString("shutdownHours")
 
                 addShutdownCard(shutdownHours, from, to)
-
                 totalMinutes += calculateDuration(from, to)
             }
 
@@ -88,7 +112,7 @@ class ScheduleActivity : AppCompatActivity() {
             createTimeline(shutdowns)
 
         } catch (e: Exception) {
-            dateText.text = "❌ Помилка парсингу: Немає інформації"
+            dateText.text = "❌ Немає інформації"
         }
     }
 
@@ -172,6 +196,24 @@ class ScheduleActivity : AppCompatActivity() {
                 )
             }
             timelineContainer.addView(block)
+        }
+    }
+
+    private fun scheduleNotifications(queue: String, name: String, jsonString: String) {
+        try {
+            val jsonArray = JSONArray(jsonString)
+            val scheduleObj = jsonArray.getJSONObject(0)
+            val queuesObj = scheduleObj.getJSONObject("queues")
+            val shutdowns = queuesObj.getJSONArray(queue)
+
+            for (i in 0 until shutdowns.length()) {
+                val shutdown = shutdowns.getJSONObject(i)
+                val from = shutdown.getString("from")
+
+                NotificationHelper.scheduleNotification(this, from, name)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

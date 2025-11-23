@@ -1,5 +1,7 @@
 package com.example.powerschedule
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -60,6 +62,7 @@ class MainActivity : AppCompatActivity() {
             queueInput.text.clear()
 
             loadQueues()
+            updateWidget()
 
             showError("✅ Чергу \"$name\" додано!", false)
         }
@@ -219,6 +222,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadQueues()
+        updateWidget()
     }
 
     private fun fetchSchedule(queue: String, name: String) {
@@ -252,6 +256,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun updateWidget() {
+        val intent = Intent(this, PowerScheduleWidget::class.java)
+        intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+        val ids = AppWidgetManager.getInstance(application)
+            .getAppWidgetIds(ComponentName(application, PowerScheduleWidget::class.java))
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        sendBroadcast(intent)
     }
 
     private fun showError(message: String, isError: Boolean) {
