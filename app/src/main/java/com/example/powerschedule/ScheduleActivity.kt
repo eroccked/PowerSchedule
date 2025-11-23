@@ -21,6 +21,7 @@ class ScheduleActivity : AppCompatActivity() {
     private lateinit var totalTimeText: TextView
     private lateinit var timelineContainer: LinearLayout
     private lateinit var notificationSwitch: SwitchCompat
+    private lateinit var autoUpdateSwitch: androidx.appcompat.widget.SwitchCompat
 
     private var queue: String = ""
     private var name: String = ""
@@ -45,11 +46,28 @@ class ScheduleActivity : AppCompatActivity() {
         val backButton = findViewById<Button>(R.id.backButton)
         val refreshButton = findViewById<Button>(R.id.refreshButton)
 
+        autoUpdateSwitch = findViewById(R.id.autoUpdateSwitch)
+
+        val prefs = getSharedPreferences("PowerSchedule", MODE_PRIVATE)
+
+        val autoUpdateEnabled = prefs.getBoolean("auto_update_$queue", true)
+        autoUpdateSwitch.isChecked = autoUpdateEnabled
+
+        autoUpdateSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("auto_update_$queue", isChecked).apply()
+
+            if (isChecked) {
+                Toast.makeText(this, "✅ Автооновлення увімкнено", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "❌ Автооновлення вимкнено для цієї черги", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         queueTitle.text = "$name ($queue)"
 
         NotificationHelper.createNotificationChannel(this)
 
-        val prefs = getSharedPreferences("PowerSchedule", MODE_PRIVATE)
+
         val notificationsEnabled = prefs.getBoolean("notifications_$queue", false)
         notificationSwitch.isChecked = notificationsEnabled
 
@@ -75,6 +93,8 @@ class ScheduleActivity : AppCompatActivity() {
             recreate()
         }
     }
+
+
 
     private fun parseAndDisplay(jsonString: String, queue: String) {
         try {

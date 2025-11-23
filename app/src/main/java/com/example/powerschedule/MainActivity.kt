@@ -37,6 +37,17 @@ class MainActivity : AppCompatActivity() {
 
         loadQueues()
 
+        val checkNowButton = findViewById<Button>(R.id.checkNowButton)
+
+        checkNowButton.setOnClickListener {
+            android.widget.Toast.makeText(this, "🔄 Перевіряємо оновлення...", android.widget.Toast.LENGTH_SHORT).show()
+            BackgroundUpdateManager.checkNow(this)
+        }
+
+        BackgroundUpdateManager.startBackgroundUpdates(this)
+
+        NotificationHelper.createNotificationChannel(this)
+
         addQueueButton.setOnClickListener {
             val name = nameInput.text.toString().trim()
             val queue = queueInput.text.toString().trim()
